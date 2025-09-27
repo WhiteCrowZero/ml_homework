@@ -3,6 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# 当前项目一些排除文件
+datasets/
+logs/
+models/
+
 # C extensions
 *.so
 
