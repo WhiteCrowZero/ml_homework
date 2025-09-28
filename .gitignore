@@ -4,16 +4,21 @@ __pycache__/
 *$py.class
 
 # 当前项目一些排除文件
-datasets/
+src/datasets/
 logs/
 models/
+#docs/source/
+#docs/make.bat
+#docs/Makefile
+test*
+temp*
 
 # C extensions
 *.so
 
 # Distribution / packaging
 .Python
-build/
+#build/
 develop-eggs/
 dist/
 downloads/
