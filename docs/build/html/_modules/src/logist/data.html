@@ -198,7 +198,7 @@
     <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">digits</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">test_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        加载 MNIST 数据集，并按需求筛选类别 &amp; 划分比例</span>
-<span class="sd">        digits : 要选择的数字类别，本实验为 (0, 1)</span>
+<span class="sd">        digits : 要选择的数字类别，本实验为 (0, 1)，多分类拓展后理论上可以为 0~9 任意组合</span>
 <span class="sd">        test_size : 测试集占比，本实验为 0.5 / 0.3 / 0.1</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># 校验参数</span>
@@ -212,6 +212,8 @@
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;参数错误: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;开始加载 MNIST 数据集，筛选类别: </span><span class="si">{</span><span class="n">digits</span><span class="si">}</span><span class="s2">, 测试集占比: </span><span class="si">{</span><span class="n">test_size</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="c1"># 加载原始数据</span>
         <span class="n">X_train</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_images</span><span class="p">(</span>

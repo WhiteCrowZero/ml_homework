@@ -8,6 +8,8 @@ Description : 对数几率回归模型文件，负责模型的加载、训练、
 """
 import copy
 import os
+import warnings
+
 import numpy as np
 from typing import Optional, Literal, Any
 
@@ -85,7 +87,15 @@ class LogisticRegression:
         """
         将 0/1 的预测结果映射回原始标签
         说明：如果是多分类的映射，不再映射回去
+
+        目前暂时弃用，未来考虑改成对外开放函数，用于呈现测试输出结果，而非单纯 0，1
         """
+        warnings.warn(
+            "_label_reverse 已废弃，请不要在新代码中使用。未来可能提供新的接口用于呈现测试输出。",
+            category=DeprecationWarning,
+            stacklevel=2,  # 指向调用处
+        )
+
         if len(self._forward_map) > 2:
             return y_pred
         return np.array([self._reverse_map[val] for val in y_pred.flatten()])
