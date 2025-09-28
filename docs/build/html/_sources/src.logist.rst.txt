@@ -20,14 +20,6 @@ src.logist.model module
    :undoc-members:
    :show-inheritance:
 
-src.logist.train module
------------------------
-
-.. automodule:: src.logist.train
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

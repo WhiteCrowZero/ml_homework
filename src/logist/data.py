@@ -112,7 +112,7 @@ class DataProcessor:
     def load(self, digits: tuple = (0, 1), test_size: float = 0.5) -> tuple:
         """
         加载 MNIST 数据集，并按需求筛选类别 & 划分比例
-        digits : 要选择的数字类别，本实验为 (0, 1)
+        digits : 要选择的数字类别，本实验为 (0, 1)，多分类拓展后理论上可以为 0~9 任意组合
         test_size : 测试集占比，本实验为 0.5 / 0.3 / 0.1
         """
         # 校验参数
@@ -126,6 +126,8 @@ class DataProcessor:
         except Exception as e:
             self.logger.error(f"参数错误: {e}")
             return ()
+
+        self.logger.info(f"开始加载 MNIST 数据集，筛选类别: {digits}, 测试集占比: {test_size}")
 
         # 加载原始数据
         X_train = self.load_images(

@@ -13,12 +13,10 @@ from data import DataProcessor
 from model import LogisticRegression
 
 
-def load_data() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    mnist_data_processor = DataProcessor(
-        r"../datasets/mnist"
-    )
+def load_data(digits=(0, 1)) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    mnist_data_processor = DataProcessor(r"../datasets/mnist")
     # mnist_data_processor.download()
-    data = mnist_data_processor.load(digits=(0, 1), test_size=0.5)
+    data = mnist_data_processor.load(digits=digits, test_size=0.5)
     if not data:
         raise ValueError("数据加载失败")
     X_train, X_test, y_train, y_test = data
@@ -36,12 +34,28 @@ def test(X_test, y_test, model: Optional[LogisticRegression] = None):
     if model is None:
         model = LogisticRegression()
         model.load_model()
-    acc = model.evaluate(X_test, y_test)
+    acc = model.evaluate(X_test, y_test, train_flag=False)
     model.logger.info(f"Test accuracy after loading: {acc:.4f}")
 
 
 if __name__ == "__main__":
+    # 原始 0/1 二分类
     X_train, X_test, y_train, y_test = load_data()
-    model = LogisticRegression()
+    model = LogisticRegression(learning_rate=0.001, epochs=512)
+
+    # # 0/1 二分类映射 其他 单个二分类
+    # X_train, X_test, y_train, y_test = load_data(digits=(2, 3))
+    # model = LogisticRegression(
+    #     label_map_dict={0: 2, 1: 3}, learning_rate=0.001, epochs=512
+    # )
+    #
+    # # 0/1 二分类映射 其他 组二分类
+    # X_train, X_test, y_train, y_test = load_data(digits=(2, 3, 4, 5))
+    # model = LogisticRegression(
+    #     label_map_dict={0: [4, 5], 1: [2, 3]}, learning_rate=0.001, epochs=512
+    # )
+
     train(X_train, y_train, model)
+    model.show_loss_pic("test")
+    model.show_acc_pic("test")
     test(X_test, y_test, model)

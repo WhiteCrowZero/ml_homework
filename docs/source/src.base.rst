@@ -20,14 +20,6 @@ src.base.model module
    :undoc-members:
    :show-inheritance:
 
-src.base.train module
----------------------
-
-.. automodule:: src.base.train
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

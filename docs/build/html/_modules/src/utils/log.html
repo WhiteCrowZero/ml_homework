@@ -71,10 +71,10 @@
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># -*- coding: utf-8 -*-</span>
 <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">File Name   : a_log_utils.py</span>
+<span class="sd">File Name   : log_utils.py</span>
 <span class="sd">Author      : wzw</span>
 <span class="sd">Date Created: 2025/4/23</span>
-<span class="sd">Description : Add your script&#39;s purpose here.</span>
+<span class="sd">Description : 日志记录工具（控制台色彩、文件记录）</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">os</span>
@@ -86,6 +86,8 @@
 <div class="viewcode-block" id="ColoredFormatter">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.log.ColoredFormatter">[文档]</a>
 <span class="k">class</span> <span class="nc">ColoredFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;为控制台输出添加颜色&quot;&quot;&quot;</span>
+
     <span class="n">COLOR_MAP</span> <span class="o">=</span> <span class="p">{</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span> <span class="s2">&quot;37&quot;</span><span class="p">,</span>  <span class="c1"># 白</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">:</span> <span class="s2">&quot;32&quot;</span><span class="p">,</span>  <span class="c1"># 绿</span>
@@ -109,14 +111,18 @@
 <div class="viewcode-block" id="setup_logger">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.log.setup_logger">[文档]</a>
 <span class="k">def</span> <span class="nf">setup_logger</span><span class="p">(</span>
-        <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
-        <span class="n">console_fmt</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> </span><span class="si">%(name)s</span><span class="s2"> </span><span class="si">%(levelname)s</span><span class="s2"> </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span>
-        <span class="n">dateformat</span><span class="o">=</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">,</span>
-        <span class="n">log_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># 如果不需要文件日志，传 None</span>
-        <span class="n">log_filename</span><span class="o">=</span><span class="s2">&quot;temu.log&quot;</span><span class="p">,</span>
-        <span class="n">max_bytes</span><span class="o">=</span><span class="mi">10</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
-        <span class="n">backup_count</span><span class="o">=</span><span class="mi">3</span>
+    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>  <span class="c1"># 日志级别</span>
+    <span class="n">console_fmt</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> </span><span class="si">%(name)s</span><span class="s2"> </span><span class="si">%(levelname)s</span><span class="s2"> </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span>  <span class="c1"># 控制台日志格式</span>
+    <span class="n">dateformat</span><span class="o">=</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">,</span>  <span class="c1"># 日志时间格式</span>
+    <span class="n">log_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># 如果不需要文件日志，传 None</span>
+    <span class="n">log_filename</span><span class="o">=</span><span class="s2">&quot;temp.log&quot;</span><span class="p">,</span>  <span class="c1"># 文件日志名称</span>
+    <span class="n">max_bytes</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>  <span class="c1"># 文件日志最大 100MB</span>
+    <span class="n">backup_count</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>  <span class="c1"># 文件日志最多保留 3 个备份</span>
 <span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    初始化日志记录器</span>
+<span class="sd">    可以设置详细参数</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">root</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span>
     <span class="n">root</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
 
@@ -141,14 +147,14 @@
         <span class="n">root</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">fh</span><span class="p">)</span></div>
 
 
+
 <div class="viewcode-block" id="init_logger">
 <a class="viewcode-back" href="../../../src.utils.html#src.utils.log.init_logger">[文档]</a>
 <span class="k">def</span> <span class="nf">init_logger</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">module_name</span><span class="p">,</span> <span class="n">log_dir</span><span class="o">=</span><span class="s2">&quot;./logs&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">):</span>
-    <span class="n">setup_logger</span><span class="p">(</span>
-        <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span>
-        <span class="n">log_dir</span><span class="o">=</span><span class="n">log_dir</span><span class="p">,</span>
-        <span class="n">log_filename</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s1">.log&#39;</span>
-    <span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    初始化日志记录器（简化版）</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">setup_logger</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">log_dir</span><span class="o">=</span><span class="n">log_dir</span><span class="p">,</span> <span class="n">log_filename</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">.log&quot;</span><span class="p">)</span>
     <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">logger</span></div>
 
@@ -158,8 +164,6 @@
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="n">setup_logger</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span> <span class="n">log_dir</span><span class="o">=</span><span class="s2">&quot;./logs&quot;</span><span class="p">)</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;This is a debug message&quot;</span><span class="p">)</span>
-
-
 </pre></div>
 
            </div>

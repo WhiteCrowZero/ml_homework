@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-File Name   : a_log_utils.py
+File Name   : log_utils.py
 Author      : wzw
 Date Created: 2025/4/23
-Description : Add your script's purpose here.
+Description : 日志记录工具（控制台色彩、文件记录）
 """
 
 import os
@@ -14,6 +14,8 @@ from logging.handlers import RotatingFileHandler
 
 
 class ColoredFormatter(logging.Formatter):
+    """为控制台输出添加颜色"""
+
     COLOR_MAP = {
         logging.DEBUG: "37",  # 白
         logging.INFO: "32",  # 绿
@@ -31,14 +33,18 @@ class ColoredFormatter(logging.Formatter):
 
 
 def setup_logger(
-        level=logging.DEBUG,
-        console_fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
-        dateformat="%Y-%m-%d %H:%M:%S",
-        log_dir=None,  # 如果不需要文件日志，传 None
-        log_filename="temu.log",
-        max_bytes=10 * 1024 * 1024,
-        backup_count=3
+    level=logging.DEBUG,  # 日志级别
+    console_fmt="%(asctime)s %(name)s %(levelname)s %(message)s",  # 控制台日志格式
+    dateformat="%Y-%m-%d %H:%M:%S",  # 日志时间格式
+    log_dir=None,  # 如果不需要文件日志，传 None
+    log_filename="temp.log",  # 文件日志名称
+    max_bytes=100 * 1024 * 1024,  # 文件日志最大 100MB
+    backup_count=3,  # 文件日志最多保留 3 个备份
 ):
+    """
+    初始化日志记录器
+    可以设置详细参数
+    """
     root = logging.getLogger()
     root.setLevel(level)
 
@@ -62,12 +68,12 @@ def setup_logger(
         fh.setFormatter(logging.Formatter(fmt=console_fmt, datefmt=dateformat))
         root.addHandler(fh)
 
+
 def init_logger(name, module_name, log_dir="./logs", level=logging.INFO):
-    setup_logger(
-        level=level,
-        log_dir=log_dir,
-        log_filename=f'{name}_{module_name}.log'
-    )
+    """
+    初始化日志记录器（简化版）
+    """
+    setup_logger(level=level, log_dir=log_dir, log_filename=f"{name}_{module_name}.log")
     logger = logging.getLogger(module_name)
     return logger
 
@@ -76,5 +82,3 @@ def init_logger(name, module_name, log_dir="./logs", level=logging.INFO):
 if __name__ == "__main__":
     setup_logger(level=logging.DEBUG, log_dir="./logs")
     logging.debug("This is a debug message")
-
-
