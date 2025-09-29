@@ -27,6 +27,7 @@ class LogisticRegression:
         epochs: int = 128,
         pic_save_path: Optional[str] = "pics",
     ):
+        self._epoch_ls = []
         self._acc_ls = []
         self._loss_ls = []
         self._theta = None
@@ -213,6 +214,7 @@ class LogisticRegression:
             if epoch % 10 == 0 or epoch == self.epochs - 1:
                 loss_val = self.loss(X, y)
                 acc_val = self.evaluate(X, y)
+                self._epoch_ls.append(epoch)
                 self._loss_ls.append(loss_val)
                 self._acc_ls.append(acc_val)
                 self.logger.info(
@@ -259,7 +261,7 @@ class LogisticRegression:
         """
         if self._loss_ls is None:
             raise ValueError("模型尚未训练，无法显示损失函数曲线")
-        plt.plot(self._loss_ls)
+        plt.plot(self._epoch_ls, self._loss_ls)
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.title("Loss Pic")
@@ -273,7 +275,7 @@ class LogisticRegression:
         """
         if self._acc_ls is None:
             raise ValueError("模型尚未训练，无法显示准确率曲线")
-        plt.plot(self._acc_ls)
+        plt.plot(self._epoch_ls, self._acc_ls)
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy")
         plt.title("Accuracy Pic")
