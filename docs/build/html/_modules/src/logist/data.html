@@ -84,6 +84,7 @@
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span> <span class="nn">src.utils.log</span> <span class="kn">import</span> <span class="n">init_logger</span>
+<span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">train_test_split</span>
 
 
 <div class="viewcode-block" id="DataProcessor">
@@ -181,7 +182,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;加载标签数据&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
 <span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">            [0:4] 魔数 (magic number)，应为 2051</span>
+<span class="sd">            [0:4] 魔数 (magic number)，应为 2049</span>
 <span class="sd">            [4:8] 样本数</span>
 <span class="sd">            &quot;&quot;&quot;</span>
             <span class="n">magic</span><span class="p">,</span> <span class="n">num</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="s2">&quot;&gt;II&quot;</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">8</span><span class="p">))</span>
@@ -213,7 +214,9 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;参数错误: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">()</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;开始加载 MNIST 数据集，筛选类别: </span><span class="si">{</span><span class="n">digits</span><span class="si">}</span><span class="s2">, 测试集占比: </span><span class="si">{</span><span class="n">test_size</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;开始加载 MNIST 数据集，筛选类别: </span><span class="si">{</span><span class="n">digits</span><span class="si">}</span><span class="s2">, 测试集占比: </span><span class="si">{</span><span class="n">test_size</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
 
         <span class="c1"># 加载原始数据</span>
         <span class="n">X_train</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_images</span><span class="p">(</span>
@@ -242,8 +245,6 @@
         <span class="n">X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="c1"># 重新划分训练集和测试集</span>
-        <span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">train_test_split</span>
-
         <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
             <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="n">y</span>
         <span class="p">)</span>
@@ -255,9 +256,7 @@
 
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-    <span class="n">mnist_data_processor</span> <span class="o">=</span> <span class="n">DataProcessor</span><span class="p">(</span>
-        <span class="sa">r</span><span class="s2">&quot;../datasets/mnist&quot;</span>
-    <span class="p">)</span>
+    <span class="n">mnist_data_processor</span> <span class="o">=</span> <span class="n">DataProcessor</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;../datasets/mnist&quot;</span><span class="p">)</span>
     <span class="n">mnist_data_processor</span><span class="o">.</span><span class="n">download</span><span class="p">()</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">mnist_data_processor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">digits</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>

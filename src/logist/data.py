@@ -14,6 +14,7 @@ import requests
 import numpy as np
 from pathlib import Path
 from src.utils.log import init_logger
+from sklearn.model_selection import train_test_split
 
 
 class DataProcessor:
@@ -98,7 +99,7 @@ class DataProcessor:
         """加载标签数据"""
         with gzip.open(filename, "rb") as f:
             """
-            [0:4] 魔数 (magic number)，应为 2051
+            [0:4] 魔数 (magic number)，应为 2049
             [4:8] 样本数
             """
             magic, num = struct.unpack(">II", f.read(8))
@@ -127,7 +128,9 @@ class DataProcessor:
             self.logger.error(f"参数错误: {e}")
             return ()
 
-        self.logger.info(f"开始加载 MNIST 数据集，筛选类别: {digits}, 测试集占比: {test_size}")
+        self.logger.info(
+            f"开始加载 MNIST 数据集，筛选类别: {digits}, 测试集占比: {test_size}"
+        )
 
         # 加载原始数据
         X_train = self.load_images(
@@ -156,8 +159,6 @@ class DataProcessor:
         X = X.reshape(X.shape[0], -1)
 
         # 重新划分训练集和测试集
-        from sklearn.model_selection import train_test_split
-
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=test_size, random_state=42, stratify=y
         )
@@ -167,9 +168,7 @@ class DataProcessor:
 
 
 if __name__ == "__main__":
-    mnist_data_processor = DataProcessor(
-        r"../datasets/mnist"
-    )
+    mnist_data_processor = DataProcessor(r"../datasets/mnist")
     mnist_data_processor.download()
     data = mnist_data_processor.load(digits=(0, 1), test_size=0.5)
     if not data:

@@ -6,16 +6,13 @@ Author      : wzw
 Date Created: 2025/9/28
 Description : 对数几率回归模型文件，负责模型的加载、训练、保存
 """
-import copy
 import os
+import copy
 import warnings
-
 import numpy as np
-from typing import Optional, Literal, Any
-
 from matplotlib import pyplot as plt
-
 from src.utils.log import init_logger
+from typing import Optional, Literal, Any
 
 
 class LogisticRegression:
@@ -69,7 +66,7 @@ class LogisticRegression:
             #         else raw_values
             #     )
 
-            # 不处理多分类的反向映射，代码更加方便，语义更合适
+        # 不处理多分类的反向映射，代码更加方便，语义更合适
         self._reverse_map = copy.deepcopy(self.label_map_dict)
 
     def _label_forward(self, y: np.ndarray) -> np.ndarray:
@@ -123,7 +120,8 @@ class LogisticRegression:
         """
         初始化参数
         """
-        return np.random.randn(*shape) * 0.01
+        return np.random.randn(*shape) * 0.01   # 随机初始化
+        # return np.zeros(shape)    # 0 初始化
 
     def sigmoid(self, z: np.ndarray) -> np.ndarray:
         """
@@ -135,10 +133,10 @@ class LogisticRegression:
 
     def loss(self, X: np.ndarray, y: np.ndarray) -> np.floating:
         """
-        计算损失
+        计算损失（交叉熵损失函数）
         """
         y_hat = self.sigmoid(X @ self._theta)
-        eps = 1e-8
+        eps = 1e-8  # 防止 log(0) 出现 -inf，给里面加一个极小量 eps
         l = -(y * np.log(y_hat + eps) + (1 - y) * np.log(1 - y_hat + eps))
         return np.mean(l)
 
@@ -292,7 +290,7 @@ if __name__ == "__main__":
 
     # 测试数据
     X = np.random.rand(100, 784)  # 100 个样本，每个 28x28 展平
-    y = np.random.randint(0, 2, size=(100,))
+    y = np.random.randint(2, 4, size=(100,))
 
     from sklearn.model_selection import train_test_split
 
@@ -302,7 +300,9 @@ if __name__ == "__main__":
     )
 
     # 初始化模型
-    model = LogisticRegression(learning_rate=0.1, epochs=10)
+    model = LogisticRegression(
+        learning_rate=0.1, epochs=10, label_map_dict={0: 2, 1: 3}
+    )
     model.train(X_train, y_train)
 
     # 评估
