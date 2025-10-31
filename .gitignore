@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 # 当前项目一些排除文件
-src/datasets/
+first/src/datasets/
 logs/
 models/
 pics/
@@ -80,7 +80,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+first/docs/_build/
 
 # PyBuilder
 .pybuilder/

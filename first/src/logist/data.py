@@ -13,7 +13,7 @@ import struct
 import requests
 import numpy as np
 from pathlib import Path
-from src.utils.log import init_logger
+from first.src.utils import init_logger
 from sklearn.model_selection import train_test_split
 
 

@@ -11,7 +11,7 @@ import copy
 import warnings
 import numpy as np
 from matplotlib import pyplot as plt
-from src.utils.log import init_logger
+from first.src.utils import init_logger
 from typing import Optional, Literal, Any
 
 
