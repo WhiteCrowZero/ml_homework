@@ -2,191 +2,303 @@
 # -*- coding: utf-8 -*-
 """
 File Name   : model.py
-Author      : wzw
 Date Created: 2025/10/31
-Description : 以ResNet为基础的模型，加入自定义卷积层
+Description : 以ResNet为基础的监督学习分类模型
 """
+import os
+import random
+from types import SimpleNamespace
+from typing import Optional, Tuple
 
-import torchvision
-from torchvision import datasets, models
-from torchvision.datasets import ImageFolder
-from torchvision.transforms import transforms, InterpolationMode
-
-import torch.backends.cudnn as cudnn
-
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler
+from torch.utils.data import DataLoader
 from torchvision import models
 
+from second.src.utils.log import init_logger
+from second.src.classify.exceptions import InvalidBackboneError
+from second.src.classify.data import ImageClassificationDataset, DatasetSplit
+from second.src.classify.visual import TrainingVisualizer
 
-class ResNetSimCLR(nn.Module):
-    def __init__(self, base_model, out_dim):
-        super(ResNetSimCLR, self).__init__()
+# 初始化日志系统
+logger = init_logger(name=__name__, module_name="ModelLoad", log_dir="logs")
+
+
+class ResNetClassifier(nn.Module):
+    """
+    基于 ResNet 的分类模型，可插入自定义卷积层。
+        base_model: 'resnet18' / 'resnet34' / 'resnet50'
+        num_classes: 输出类别数
+        use_custom_conv: 是否添加自定义卷积层（默认False）
+    """
+
+    def __init__(
+        self, base_model: str, num_classes: int, use_custom_conv: bool = False
+    ) -> None:
+        super().__init__()
+
         self.resnet_dict = {
             "resnet18": models.resnet18(weights=None),
-            "resnet34": models.resnet34(weights=None),   # backbone baru
+            "resnet34": models.resnet34(weights=None),
             "resnet50": models.resnet50(weights=None),
         }
-        self.backbone = self._get_basemodel(base_model)
-        dim_mlp = self.backbone.fc.in_features
 
- # Projection head baru: Linear -> BN -> ReLU -> Linear(out_dim)
-        self.backbone.fc = nn.Sequential(
-        nn.Linear(dim_mlp, dim_mlp*2),
-        nn.BatchNorm1d(dim_mlp*2),
-        nn.ReLU(inplace=True),
-        nn.Linear(dim_mlp*2, args.out_dim)
-    )
+        if base_model not in self.resnet_dict:
+            raise InvalidBackboneError(
+                f"无效基础模型： '{base_model}'，请选择： resnet18/34/50"
+            )
 
+        # 取 backbone
+        self.backbone = self.resnet_dict[base_model]
+        dim_in = self.backbone.fc.in_features
+        self.backbone.fc = nn.Identity()
 
-    def _get_basemodel(self, model_name):
-        try:
-            model = self.resnet_dict[model_name]
-        except KeyError:
-            raise InvalidBackboneError("Backbone invalid. Gunakan resnet18, resnet34, atau resnet50.")
+        # 自定义卷积层
+        if use_custom_conv:
+            self.custom_conv = nn.Sequential(
+                nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(3),
+                nn.ReLU(inplace=True),
+            )
         else:
-            return model
+            self.custom_conv = nn.Identity()
 
-    def forward(self, x):
-        return self.backbone(x)
+        # 分类头（MLP Head）
+        self.classifier_head = nn.Sequential(
+            nn.Linear(dim_in, dim_in * 2),
+            nn.BatchNorm1d(dim_in * 2),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.3),
+            nn.Linear(dim_in * 2, num_classes),
+        )
+
+        # 损失函数
+        self.cost_function = nn.CrossEntropyLoss()
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """前向传播"""
+        x = self.custom_conv(x)
+        features = self.backbone(x)
+        logits = self.classifier_head(features)
+        return logits, features
+
+    def compute_loss(
+        self, predictions: torch.Tensor, targets: torch.Tensor
+    ) -> torch.Tensor:
+        """计算分类损失"""
+        return self.cost_function(predictions, targets)
 
 
-class SimCLR:
-    def __init__(self, model, optimizer, scheduler, args):
+class SupervisedTrainer:
+    """
+    标准监督学习训练类
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        optimizer: Optimizer,
+        scheduler: _LRScheduler,
+        args: SimpleNamespace,
+    ) -> None:
+        self.args = args
+        self.save_path = args.save_path
         self.model = model.to(args.device)
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.args = args
+        self.visualizer = TrainingVisualizer()
+        self.visual_method=args.visual_method
+        self.lab_init(args.seed)
 
-    def nt_xent_loss(self, z1, z2, temperature=0.5):
-        z1 = F.normalize(z1, dim=1)
-        z2 = F.normalize(z2, dim=1)
-        N = z1.size(0)
-        z = torch.cat([z1, z2], dim=0)  # [2N, D]
-        sim = torch.matmul(z, z.t())    # [2N, 2N]
-        mask = torch.eye(2 * N, dtype=torch.bool, device=z.device)
-        sim = sim[~mask].view(2 * N, 2 * N - 1)
-        pos = torch.sum(z1 * z2, dim=-1)
-        pos = torch.cat([pos, pos], dim=0)
-        sim = sim / temperature
-        denom = torch.logsumexp(sim, dim=1)
-        loss = -pos / temperature + denom
-        return loss.mean()
+        self.train_loss_history, self.val_loss_history = [], []
+        self.train_acc_history, self.val_acc_history = [], []
+        self.best_acc = 0.0
 
-    def train(self, train_loader):
+    @staticmethod
+    def lab_init(seed: int) -> None:
+        """
+        初始化随机种子，保证实验重复性
+        """
+        # 设置随机种子，保证实验重复性
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+
+        # 查看版本和可用设备
+        logger.info(
+            f"PyTorch: {torch.__version__} | CUDA available: {torch.cuda.is_available()}"
+        )
+
+    def save_checkpoint(self, epoch: int, acc: float, is_best: bool) -> None:
+        """
+        保存模型检查点。
+        is_best=True 则额外保存为 model_best.pth.tar。
+        """
+        state = {
+            "epoch": epoch,
+            "state_dict": self.model.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "acc": acc,
+        }
+        os.makedirs(self.save_path, exist_ok=True)
+        ckpt_path = f"{self.save_path}/epoch_{epoch}.pth"
+        torch.save(state, ckpt_path)
+        if is_best:
+            torch.save(state, f"{self.save_path}/model_best.pth")
+            logger.info(f"最佳模型已保存到 {self.save_path}/model_best.pth")
+
+    def train_one_epoch(self, dataloader: DataLoader, epoch: int) -> (float, float):
+        """单轮训练"""
         self.model.train()
-        loss_history = []
+        total_loss, total_correct, total = 0, 0, 0
+        for images, targets in dataloader:
+            images, targets = images.to(self.args.device), targets.to(self.args.device)
+            outputs, _ = self.model(images)
+            loss = self.model.compute_loss(outputs, targets)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            total_loss += loss.item() * images.size(0)
+            preds = outputs.argmax(1)
+            total_correct += (preds == targets).sum().item()
+            total += targets.size(0)
+
+        avg_loss = total_loss / total
+        avg_acc = total_correct / total * 100
+        return avg_loss, avg_acc
+
+    def validate(self, dataloader: DataLoader) -> Tuple[float, float]:
+        """验证集评估"""
+        self.model.eval()
+        total_loss, total_correct, total = 0, 0, 0
+
+        with torch.no_grad():
+            for images, targets in dataloader:
+                images, targets = images.to(self.args.device), targets.to(
+                    self.args.device
+                )
+                outputs, _ = self.model(images)
+                loss = self.model.compute_loss(outputs, targets)
+                total_loss += loss.item() * images.size(0)
+                preds = outputs.argmax(1)
+                total_correct += (preds == targets).sum().item()
+                total += targets.size(0)
+
+        avg_loss = total_loss / total
+        acc = total_correct / total * 100
+        return avg_loss, acc
+
+    def extract_features(self, dataloader):
+        """提取真实特征用于可视化"""
+        self.model.eval()
+        feats, labels = [], []
+        with torch.no_grad():
+            for images, targets in dataloader:
+                images = images.to(self.args.device)
+                _, f = self.model(images)
+                feats.append(f.cpu().numpy())
+                labels.append(targets.numpy())
+        return np.concatenate(feats), np.concatenate(labels)
+
+    def train(
+        self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None
+    ) -> None:
+        """完整训练流程"""
+        logger.info("开始监督学习训练！")
+        # 训练前可视化
+        if val_loader:
+            logger.info("训练前特征投影可视化")
+            feats, labels = self.extract_features(val_loader)
+            self.visualizer.visualize_feature_projection(feats, labels, method=self.visual_method)
+
         for epoch in range(1, self.args.epochs + 1):
-            running = 0.0
-            for step, (views, _) in enumerate(train_loader, start=1):
-                x1, x2 = views
-                x1, x2 = x1.to(self.args.device), x2.to(self.args.device)
-                z1 = self.model(x1)
-                z2 = self.model(x2)
-                loss = self.nt_xent_loss(z1, z2, temperature=self.args.temperature)
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-                running += loss.item()
-                if step % self.args.log_every_n_steps == 0:
-                    print(f"Epoch {epoch}/{self.args.epochs} Step {step}/{len(train_loader)} Loss {running/self.args.log_every_n_steps:.4f}")
-                    running = 0.0
+            train_loss, train_acc = self.train_one_epoch(train_loader, epoch)
+            val_loss, val_acc = self.validate(val_loader)
             self.scheduler.step()
-            loss_history.append(loss.item())
-            print(f"[Epoch {epoch}] Loss: {loss.item():.4f}")
-        return loss_history
 
-import torch
-from types import SimpleNamespace
-import torch.backends.cudnn as cudnn
-from torchvision import datasets, transforms
+            self.train_loss_history.append(train_loss)
+            self.train_acc_history.append(train_acc)
+            self.val_loss_history.append(val_loss)
+            self.val_acc_history.append(val_acc)
 
-# ======================
-# Setup Argumen
-# ======================
-args = SimpleNamespace()
-args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# Ganti path dataset Tiny-ImageNet kalau berbeda
-# Struktur: tiny-imagenet-200/{train, val}
-args.data = '/kaggle/input/tiny-imagenet'
+            logger.info(
+                f"[Epoch {epoch}/{self.args.epochs}] "
+                f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
+                f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
+            )
 
-cudnn.deterministic = True
-cudnn.benchmark = True
+            self.save_checkpoint(epoch, val_acc, is_best=val_acc > self.best_acc)
+            self.best_acc = max(self.best_acc, val_acc)
 
-args.dataset_name = 'tinyimagenet'
-args.n_views = 2
-args.batch_size = 512
-args.out_dim = 256
-args.lr = 0.0003
-args.weight_decay = 1e-4
-args.arch = 'resnet50'   # bisa diganti 'resnet18'
-args.workers = 2
-args.gpu_index = 0
-args.log_dir = './logs/simclr'
-args.fp16_precision = True
-args.epochs = 10
-args.temperature = 0.5
-args.seed = 1
-args.log_every_n_steps = 50
+        # 绘制训练曲线
+        self.visualizer.plot_training_curves(
+            self.train_loss_history,
+            self.train_acc_history,
+            self.val_loss_history,
+            self.val_acc_history,
+        )
 
-# ======================
-# Dataset
-# ======================
-dataset = ContrastiveLearningDataset(args.data)
+        # 提取特征再可视化
+        if val_loader:
+            logger.info("训练后特征投影可视化")
+            feats, labels = self.extract_features(val_loader)
+            self.visualizer.visualize_feature_projection(feats, labels, method=self.visual_method)
 
-# Train dataset (self-supervised pretraining)
-train_dataset = dataset.get_dataset(args.dataset_name, args.n_views)
-train_loader = torch.utils.data.DataLoader(
-    train_dataset,
-    batch_size=min(args.batch_size, 512),   # 512 disarankan
-    shuffle=True,
-    num_workers=max(2, args.workers, 4),    # 4–8 biasanya oke di P100
-    pin_memory=True,
-    persistent_workers=True,
-    prefetch_factor=4,
-    drop_last=True
-)
-
-# Validation dataset (evaluasi setelah training)
-val_transform = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-])
-
-# Path val Tiny-ImageNet
-val_dataset = datasets.ImageFolder(root=f"{args.data}/tiny-imagenet-200/val", transform=val_transform)
-
-val_loader = torch.utils.data.DataLoader(
-    val_dataset,
-    batch_size=args.batch_size,
-    shuffle=False,
-    num_workers=args.workers,
-    pin_memory=True
-)
-
-# ======================
-# Model + Optimizer + Scheduler
-# ======================
-model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim)
-optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-
-# Cosine LR scheduler
-total_steps = args.epochs * len(train_loader)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps)
+        logger.info("训练完成")
 
 
-# ======================
-# Training SimCLR
-# ======================
-simclr = SimCLR(model=model, optimizer=optimizer, scheduler=scheduler, args=args)
+if __name__ == "__main__":
+    import torch.optim as optim
 
-# Pretraining di train_loader
-loss_history = simclr.train(train_loader)
+    args = SimpleNamespace(
+        data_path="../../datasets",
+        save_path="checkpoints",
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        epochs=3,
+        lr=1e-3,
+        weight_decay=1e-4,
+        log_every_n_steps=50,
+        batch_size=64,
+        num_classes=20,
+        visual_method="tsne",
+        seed=0,
+    )
 
-# ======================
-# (Optional) Evaluasi pakai val_loader
-# ======================
-# Contoh evaluasi: ambil embedding dan hitung loss / akurasi kNN
-# val_loss = simclr.evaluate(val_loader)
+    # # 自定义卷积层参数
+    # custom_conv_params = {"kernel_size": 3, "out_channels": 32}
+
+    # 模型实例化
+    model = ResNetClassifier(
+        base_model="resnet18",
+        num_classes=20,
+        # use_custom_conv=True,
+        # custom_conv_params=custom_conv_params,
+    )
+
+    # 优化器与调度器
+    optimizer = optim.Adam(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+
+    # 数据集接口
+    dataset = ImageClassificationDataset(
+        root_folder=args.data_path, num_classes=args.num_classes
+    )
+    train_dataset = dataset.get_dataset(DatasetSplit.TRAIN)
+    val_dataset = dataset.get_dataset(DatasetSplit.VAL)
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=True
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=args.batch_size, shuffle=False
+    )
+
+    # 训练
+    trainer = SupervisedTrainer(model, optimizer, scheduler, args)
+    trainer.train(train_loader, val_loader)

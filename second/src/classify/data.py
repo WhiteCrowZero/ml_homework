@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 File Name   : data.py
-Author      : wzw
 Date Created: 2025/10/31
 Description : 图像分类数据处理模块（针对 Tiny ImageNet）
 """
@@ -19,7 +18,7 @@ from torchvision.datasets import ImageFolder
 from torchvision.transforms import InterpolationMode, Compose
 
 from second.src.utils.log import init_logger
-from second.src.utils.exceptions import (
+from second.src.classify.exceptions import (
     InvalidDatasetSelection,
     InvalidDatasetClassesNum,
 )
@@ -153,5 +152,5 @@ class ImageClassificationDataset:
 
 if __name__ == "__main__":
     # 测试数据集加载
-    dataset = ImageClassificationDataset(root_folder="../datasets", num_classes=20)
+    dataset = ImageClassificationDataset(root_folder="../../datasets", num_classes=20)
     train_dataset = dataset.get_dataset(DatasetSplit.TRAIN)

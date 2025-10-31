@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 File Name   : log_utils.py
-Author      : wzw
 Date Created: 2025/4/23
 Description : 日志记录工具（控制台色彩、文件记录）
 """

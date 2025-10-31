@@ -4,15 +4,14 @@ __pycache__/
 *$py.class
 
 # 当前项目一些排除文件
-first/src/datasets/
+datasets/
 logs/
 models/
 pics/
-#docs/source/
-#docs/make.bat
-#docs/Makefile
 test*
 temp*
+*.png
+checkpoint*
 
 # C extensions
 *.so
