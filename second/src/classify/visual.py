@@ -6,6 +6,7 @@ Date Created: 2025/10/31
 Description : 数据可视化
                 1. 模型训练时的折线图，包括loss和acc
                 2. 高维数据到二维数据的投影示意图
+                3. 卷积核特征投影
 """
 import math
 import os
@@ -25,10 +26,7 @@ logger = init_logger(__name__, module_name="DataVisual", log_dir="logs")
 
 class TrainingVisualizer:
     """
-    用于训练过程与高维特征的可视化分析。
-    包含:
-        1. Loss / Acc 曲线绘制
-        2. t-SNE / PCA 特征分布可视化
+    用于训练过程与高维特征的可视化分析
     """
 
     def __init__(self) -> None:
@@ -124,13 +122,14 @@ class TrainingVisualizer:
 
         logger.info(f"降维完成，开始绘制 {title} ...")
         plt.figure(figsize=(8, 6))
+        # 根据类别标签绘制不同颜色
         num_classes = len(np.unique(labels))
         if num_classes <= 10:
-            cmap = plt.get_cmap("tab10")  # 极清晰 10 色
+            cmap = plt.get_cmap("tab10")
         elif num_classes <= 20:
-            cmap = plt.get_cmap("tab20")  # 扩展版
+            cmap = plt.get_cmap("tab20")
         else:
-            cmap = plt.get_cmap("hsv", num_classes)  # 多类动态分布颜色
+            cmap = plt.get_cmap("hsv", num_classes)
         plt.scatter(emb[:, 0], emb[:, 1], c=labels, cmap=cmap, s=12, alpha=0.8)
         plt.colorbar()
         plt.title(title)
@@ -197,7 +196,7 @@ if __name__ == "__main__":
     # 创建可视化实例
     visualizer = TrainingVisualizer()
 
-    # 1. 绘制训练过程曲线
+    # 绘制训练过程曲线
     visualizer.plot_training_curves(
         loss_history=train_losses,
         acc_history=train_acc,
@@ -205,6 +204,6 @@ if __name__ == "__main__":
         val_acc_history=val_acc,
     )
 
-    # 2. 可视化高维特征分布
+    # 可视化高维特征分布
     visualizer.visualize_feature_projection(feats, labels, method="tsne", perplexity=30)
     visualizer.visualize_feature_projection(feats, labels, method="pca")

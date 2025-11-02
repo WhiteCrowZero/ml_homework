@@ -3,12 +3,13 @@
 """
 File Name   : model.py
 Date Created: 2025/10/31
-Description : 以ResNet为基础的监督学习分类模型
+Description : 参考ResNet的监督学习分类模型
 """
 import os
 import random
 from types import SimpleNamespace
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
+import math
 from tqdm import tqdm
 
 import numpy as np
@@ -28,12 +29,6 @@ logger = init_logger(name=__name__, module_name="ModelLoad", log_dir="logs")
 
 # 卷积加速
 torch.backends.cudnn.benchmark = True
-
-import math
-
-import torch
-import torch.nn as nn
-from typing import Tuple, Dict
 
 
 def rand_bbox_xyxy(W, H, lam):
@@ -70,7 +65,7 @@ def build_param_groups(model, wd):
     ]
 
 
-def lr_lambda(e):  # e 从 0 开始
+def lr_lambda(e):
     e += 1
     if e <= warmup:
         return e / warmup
@@ -158,7 +153,7 @@ class CompactResNet(nn.Module):
         label_smoothing: float = 0.05,
     ):
         super().__init__()
-        # 选择归一化层：BN（默认）或 GN（小 batch 更稳）
+        # 选择归一化层
         if use_groupnorm:
             norm_layer = lambda c: nn.GroupNorm(8, c)
         else:
@@ -211,7 +206,7 @@ class CompactResNet(nn.Module):
         # init
         self._init_weights()
 
-        # feature_maps 存放接口（trainer 里可能使用）
+        # feature_maps 存放接口
         self.feature_maps: Dict[str, torch.Tensor] = {}
 
     def _make_stage(
@@ -264,7 +259,7 @@ class CompactResNet(nn.Module):
             self.feature_maps["layer3"] = x.detach().cpu()
 
         pooled = self.avgpool(x)
-        pooled = torch.flatten(pooled, 1)  # (B, feat_dim)
+        pooled = torch.flatten(pooled, 1)
         feat = self.fc1(pooled)
         if not isinstance(self.bn_fc, nn.Identity):
             feat = self.bn_fc(feat)
@@ -445,7 +440,7 @@ class SupervisedTrainer:
             total_acc += batch_acc * bs
             total += bs
 
-            # 每 20 epoch 保存特征图（保持原逻辑）
+            # 每 20 epoch 保存特征图
             if (
                 batch_idx == 0
                 and epoch % 20 == 0
@@ -485,7 +480,7 @@ class SupervisedTrainer:
                     outputs, _ = self.model(images)
                     loss = self.model.compute_loss(outputs, targets)
 
-                # 首批次断言（再次确认）
+                # 首批次断言
                 if batch_idx == 0:
                     if outputs.ndim != 2 or outputs.shape[1] != getattr(
                         self.args, "num_classes", 10
@@ -577,18 +572,19 @@ if __name__ == "__main__":
         data_path="/home/ubuntu/train/datasets",
         save_path="checkpoints",
         dataset_name="imagenet100",
+        # dataset_name="tinyimagenet",
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         device_str="cuda" if torch.cuda.is_available() else "cpu",
         use_amp=True,
-        epochs=100,
-        lr=1e-3,
+        epochs=50,
+        lr=1e-4,
         weight_decay=1e-2,
         batch_size=64,
-        num_classes=10,
+        num_classes=5,
         visual_method="tsne",
-        use_mixup=True,
+        use_mixup=False,
         mixup_alpha=0.4,
-        use_cutmix=True,
+        use_cutmix=False,
         cutmix_alpha=1.0,
         mix_prob=0.5,
         seed=0,
