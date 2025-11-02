@@ -7,16 +7,17 @@ Description : 数据可视化
                 1. 模型训练时的折线图，包括loss和acc
                 2. 高维数据到二维数据的投影示意图
 """
+import math
 import os
-import warnings
 
+import torch
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from typing import List, Optional
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
-
-from second.src.utils.log import init_logger
+from src.utils.log import init_logger
 
 # 初始化logger
 logger = init_logger(__name__, module_name="DataVisual", log_dir="logs")
@@ -31,23 +32,8 @@ class TrainingVisualizer:
     """
 
     def __init__(self) -> None:
-        self._init_load()
-        plt.style.use("seaborn-v0_8")
+        matplotlib.use("Agg")
         logger.info("TrainingVisualizer 已初始化，可进行训练过程与特征分布可视化。")
-
-    @staticmethod
-    def _init_load():
-        """修复可视化前一些环境变量或依赖问题"""
-        # 设置 Matplotlib 使用支持中文的字体
-        plt.rcParams["font.sans-serif"] = ["SimHei"]  # 黑体（Windows 默认支持）
-        plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
-
-        # 设置多进程环境变量
-        os.environ["LOKY_MAX_CPU_COUNT"] = "8"
-
-        # 忽略字体相关警告
-        warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
-        warnings.filterwarnings("ignore", message="Glyph .* missing from font")
 
     def plot_training_curves(
         self,
@@ -60,26 +46,39 @@ class TrainingVisualizer:
 
         logger.info("开始绘制训练过程曲线图...")
         epochs = np.arange(1, len(loss_history) + 1)
-        plt.figure(figsize=(10, 5))
 
-        plt.plot(epochs, loss_history, label="训练损失", linewidth=2)
+        # loss
+        plt.figure(figsize=(8, 5))
+        plt.plot(epochs, loss_history, label="Train Loss", linewidth=2)
         if val_loss_history:
-            plt.plot(epochs, val_loss_history, label="验证损失", linestyle="--")
+            plt.plot(epochs, val_loss_history, label="Val Loss", linestyle="--")
 
-        if acc_history:
-            plt.plot(epochs, acc_history, label="训练准确率", linewidth=2)
-        if val_acc_history:
-            plt.plot(epochs, val_acc_history, label="验证准确率", linestyle="--")
-
-        plt.xlabel("训练轮数 (Epoch)")
-        plt.ylabel("数值 (Value)")
-        plt.title("模型训练过程可视化")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Training & Validation Loss")
         plt.legend()
         plt.grid(True, linestyle="--", alpha=0.5)
-        plt.show()
-        plt.savefig("training_curves.png")
+        plt.tight_layout()
+        plt.savefig("training_loss.png")
+        plt.close()
 
-        logger.info("训练与验证曲线绘制完成。")
+        plt.figure(figsize=(8, 5))
+        if acc_history is not None:
+            plt.plot(epochs, acc_history, label="Train Accuracy", linewidth=2)
+            if val_acc_history is not None:
+                plt.plot(epochs, val_acc_history, label="Val Accuracy", linestyle="--")
+            plt.xlabel("Epoch")
+            plt.ylabel("Accuracy (%)")
+            plt.title("Training & Validation Accuracy")
+            plt.legend()
+            plt.grid(True, linestyle="--", alpha=0.5)
+            plt.tight_layout()
+            plt.savefig("training_accuracy.png")
+            plt.close()
+        else:
+            logger.warning("未提供准确率数据，仅绘制损失曲线。")
+
+        logger.info("训练过程曲线图已保存。")
 
     def visualize_feature_projection(
         self,
@@ -87,7 +86,7 @@ class TrainingVisualizer:
         labels: np.ndarray,
         method: str = "tsne",
         perplexity: float = 30.0,
-        n_iter: int = 500,
+        max_iter: int = 500,
     ) -> None:
         """
         使用 t-SNE 或 PCA 对高维特征降维到二维并可视化。
@@ -97,41 +96,89 @@ class TrainingVisualizer:
             labels: (N,) 对应类别标签
             method: "tsne" 或 "pca"
             perplexity: t-SNE 参数
-            n_iter: t-SNE 迭代次数
+            max_iter: t-SNE 迭代次数
         """
         assert feats.ndim == 2, "输入特征必须是二维的 [样本数, 特征维度]"
         assert len(feats) == len(labels), "特征与标签长度不匹配"
 
         logger.info(f"开始执行 {method.upper()} 降维可视化...")
+
         if method.lower() == "tsne":
             tsne = TSNE(
                 n_components=2,
                 perplexity=perplexity,
-                n_iter=n_iter,
+                max_iter=max_iter,
                 verbose=1,
                 init="pca",
                 learning_rate="auto",
             )
             emb = tsne.fit_transform(feats)
-            title = "t-SNE 降维后的特征分布"
+            title = "t-SNE Feature Projection"
         elif method.lower() == "pca":
             pca = PCA(n_components=2)
             emb = pca.fit_transform(feats)
-            title = "PCA 降维后的特征分布"
+            title = "PCA Feature Projection"
         else:
-            logger.error("method 参数错误，应为 'tsne' 或 'pca'")
-            raise ValueError("method 必须为 'tsne' 或 'pca'")
+            logger.error("method must be 'tsne' or 'pca'")
+            raise ValueError("method must be 'tsne' or 'pca'")
 
         logger.info(f"降维完成，开始绘制 {title} ...")
         plt.figure(figsize=(8, 6))
-        plt.scatter(emb[:, 0], emb[:, 1], c=labels, s=6, alpha=0.7, cmap="tab10")
+        num_classes = len(np.unique(labels))
+        if num_classes <= 10:
+            cmap = plt.get_cmap("tab10")  # 极清晰 10 色
+        elif num_classes <= 20:
+            cmap = plt.get_cmap("tab20")  # 扩展版
+        else:
+            cmap = plt.get_cmap("hsv", num_classes)  # 多类动态分布颜色
+        plt.scatter(emb[:, 0], emb[:, 1], c=labels, cmap=cmap, s=12, alpha=0.8)
+        plt.colorbar()
         plt.title(title)
-        plt.xlabel("维度 1")
-        plt.ylabel("维度 2")
+        plt.xlabel("Component 1")
+        plt.ylabel("Component 2")
         plt.grid(True, linestyle="--", alpha=0.4)
-        plt.show()
         plt.savefig("feature_projection.png")
+
         logger.info(f"{method.upper()} 特征分布可视化完成。")
+
+    def visualize_feature_maps(
+        self,
+        feature_maps: torch.Tensor,
+        save_dir: str = "feature_maps",
+        max_maps: int = 8,
+        n_cols: int = 4,
+        idx: int = 0,
+    ):
+        """
+        可视化特征图，自动拼 grid
+        feature_maps: (B, C, H, W)
+        """
+        os.makedirs(save_dir, exist_ok=True)
+
+        feature_maps = feature_maps.detach().cpu()[0]  # 取 batch 第一张
+        C = feature_maps.shape[0]
+        num_maps = min(C, max_maps)
+
+        # 计算行数
+        n_rows = math.ceil(num_maps / n_cols)
+
+        plt.figure(figsize=(n_cols * 3, n_rows * 3))
+
+        for i in range(num_maps):
+            fmap = feature_maps[i].numpy()
+
+            # 子图
+            ax = plt.subplot(n_rows, n_cols, i + 1)
+            ax.imshow(fmap, cmap="gray")
+            ax.axis("off")
+            ax.set_title(f"Channel {i}")
+
+        save_path = os.path.join(save_dir, f"feature_grid_{idx}.png")
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=200)
+        plt.close()
+
+        logger.info(f"特征图已保存: {save_path}")
 
 
 if __name__ == "__main__":

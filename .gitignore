@@ -12,6 +12,7 @@ test*
 temp*
 *.png
 checkpoint*
+online/
 
 # C extensions
 *.so
